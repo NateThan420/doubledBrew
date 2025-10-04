@@ -4,14 +4,98 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard</title>
+
+
+    <!-- Cache-Buster -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+
+    <!-- Bootstrap for table and form styling (used by inventory UI) -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="dashboard-container">
-        <h1>Welcome to the Dashboard!</h1>
-        <p>You have successfully logged in.</p>
+    <header class="page-header">
+        <h1 class="page-title">Dashboard</h1>
         <button id="logoutBtn">Logout</button>
+    </header>
+
+    <!-- Integrated inventory UI from testdashboard.html -->
+    <div class="container inventory-area">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h3>Inventory (static)</h3>
+            <div>
+                <button id="addBtn" class="btn btn-primary btn-sm">Add product</button>
+                <button id="exportBtn" class="btn btn-outline-secondary btn-sm">Export CSV</button>
+                <button id="clearBtn" class="btn btn-danger btn-sm">Clear all</button>
+            </div>
+        </div>
+
+            <!-- Inventory summary cards -->
+            <div class="row mb-3 inventory-stats">
+                <div class="col-12 col-sm-4 mb-2">
+                    <div class="p-2 bg-white rounded shadow-sm text-center">
+                        <div class="small text-muted">Product types</div>
+                        <div id="statTypes" class="h5 mb-0">0</div>
+                    </div>
+                </div>
+                <div class="col-12 col-sm-4 mb-2">
+                    <div class="p-2 bg-white rounded shadow-sm text-center">
+                        <div class="small text-muted">Total items</div>
+                        <div id="statTotalItems" class="h5 mb-0">0</div>
+                    </div>
+                </div>
+                <div class="col-12 col-sm-4 mb-2">
+                    <div class="p-2 bg-white rounded shadow-sm text-center">
+                        <div class="small text-muted">Inventory value</div>
+                        <div id="statValue" class="h5 mb-0">₱0.00</div>
+                    </div>
+                </div>
+            </div>
+
+        <div class="mb-3 d-flex gap-2">
+            <input id="search" class="form-control form-control-sm" placeholder="Search by name or SKU">
+            <label class="form-check-label small"><input id="showLow" type="checkbox" class="form-check-input ms-2 me-1">Show low-stock only</label>
+        </div>
+
+        <table class="table table-sm table-hover" id="productsTable">
+            <thead class="table-light"><tr><th>SKU</th><th>Name</th><th>Stock</th><th>Price</th><th>Total Value</th><th>Threshold</th><th>Actions</th></tr></thead>
+            <tbody></tbody>
+        </table>
+
+        <!-- Modal (simple) -->
+        <div class="modal" tabindex="-1" id="modal">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="modalTitle">Add product</h5>
+                        <button type="button" class="btn-close" id="modalClose"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="prodForm">
+                            <div class="mb-2"><label class="form-label small">SKU</label><input name="sku" class="form-control form-control-sm" required></div>
+                            <div class="mb-2"><label class="form-label small">Name</label><input name="name" class="form-control form-control-sm" required></div>
+                            <div class="mb-2"><label class="form-label small">Description</label><input name="description" class="form-control form-control-sm"></div>
+                            <div class="row g-2">
+                                <div class="col-4"><label class="form-label small">Price</label><input name="price" type="number" step="0.01" class="form-control form-control-sm" value="0.00" required></div>
+                                <div class="col-4"><label class="form-label small">Stock</label><input name="stock" type="number" class="form-control form-control-sm" value="0" required></div>
+                                <div class="col-4"><label class="form-label small">Threshold</label><input name="reorder_threshold" type="number" class="form-control form-control-sm" value="5" required></div>
+                            </div>
+                            <input type="hidden" name="id">
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button id="saveBtn" class="btn btn-primary btn-sm">Save</button>
+                        <button id="cancelBtn" class="btn btn-secondary btn-sm">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </div>
+
     <script src="logout.js"></script>
+    <script src="inventory.js"></script>
 </body>
 </html>

@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Inventory (static)</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body{padding:18px;background:#f8f9fa}
+    .low{background:#fff3cd}
+    .small{font-size:.9rem}
+    .modal{display:none;background:rgba(0,0,0,.4);position:fixed;inset:0;align-items:center;justify-content:center}
+    .modal.show{display:flex}
+    .modal-dialog{max-width:520px}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h3>Inventory (static)</h3>
+      <div>
+        <button id="addBtn" class="btn btn-primary btn-sm">Add product</button>
+        <button id="exportBtn" class="btn btn-outline-secondary btn-sm">Export CSV</button>
+        <button id="clearBtn" class="btn btn-danger btn-sm">Clear all</button>
+      </div>
+    </div>
+
+    <div class="mb-3 d-flex gap-2">
+      <input id="search" class="form-control form-control-sm" placeholder="Search by name or SKU">
+      <label class="form-check-label small"><input id="showLow" type="checkbox" class="form-check-input ms-2 me-1">Show low-stock only</label>
+    </div>
+
+    <table class="table table-sm table-hover" id="productsTable">
+      <thead class="table-light"><tr><th>SKU</th><th>Name</th><th>Stock</th><th>Price</th><th>Threshold</th><th>Actions</th></tr></thead>
+      <tbody></tbody>
+    </table>
+
+    <!-- Modal (simple) -->
+    <div class="modal" tabindex="-1" id="modal">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="modalTitle">Add product</h5>
+            <button type="button" class="btn-close" id="modalClose"></button>
+          </div>
+          <div class="modal-body">
+            <form id="prodForm">
+              <div class="mb-2"><label class="form-label small">SKU</label><input name="sku" class="form-control form-control-sm" required></div>
+              <div class="mb-2"><label class="form-label small">Name</label><input name="name" class="form-control form-control-sm" required></div>
+              <div class="mb-2"><label class="form-label small">Description</label><input name="description" class="form-control form-control-sm"></div>
+              <div class="row g-2">
+                <div class="col-4"><label class="form-label small">Price</label><input name="price" type="number" step="0.01" class="form-control form-control-sm" value="0.00" required></div>
+                <div class="col-4"><label class="form-label small">Stock</label><input name="stock" type="number" class="form-control form-control-sm" value="0" required></div>
+                <div class="col-4"><label class="form-label small">Threshold</label><input name="reorder_threshold" type="number" class="form-control form-control-sm" value="5" required></div>
+              </div>
+              <input type="hidden" name="id">
+            </form>
+          </div>
+          <div class="modal-footer">
+            <button id="saveBtn" class="btn btn-primary btn-sm">Save</button>
+            <button id="cancelBtn" class="btn btn-secondary btn-sm">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+<script>
+(function(){
+  // simple localStorage-backed inventory app
+  const LS_KEY = 'inventory_static_v1'
+  const tbl = document.querySelector('#productsTable tbody')
+  const addBtn = document.getElementById('addBtn')
+  const exportBtn = document.getElementById('exportBtn')
+  const clearBtn = document.getElementById('clearBtn')
+  const search = document.getElementById('search')
+  const showLow = document.getElementById('showLow')
+
+  const modal = document.getElementById('modal')
+  const modalTitle = document.getElementById('modalTitle')
+  const modalClose = document.getElementById('modalClose')
+  const prodForm = document.getElementById('prodForm')
+  const saveBtn = document.getElementById('saveBtn')
+  const cancelBtn = document.getElementById('cancelBtn')
+
+  function load(){
+    try{ return JSON.parse(localStorage.getItem(LS_KEY)) || [] }catch(e){return []}
+  }
+  function save(data){ localStorage.setItem(LS_KEY, JSON.stringify(data)) }
+
+  let products = load()
+
+  function id(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,6) }
+
+  function render(){
+    const q = search.value.trim().toLowerCase()
+    const onlyLow = showLow.checked
+    tbl.innerHTML = ''
+    products.forEach(p=>{
+      if(q && !(p.sku.toLowerCase().includes(q) || p.name.toLowerCase().includes(q))) return
+      if(onlyLow && !(p.stock <= p.reorder_threshold)) return
+      const tr = document.createElement('tr')
+      if(p.stock <= p.reorder_threshold) tr.classList.add('low')
+      tr.innerHTML = `
+        <td>${escapeHtml(p.sku)}</td>
+        <td>${escapeHtml(p.name)}</td>
+        <td>${p.stock}</td>
+        <td>₱${Number(p.price).toFixed(2)}</td>
+        <td>${p.reorder_threshold}</td>
+        <td>
+          <button class="btn btn-sm btn-outline-secondary btn-edit">Edit</button>
+          <button class="btn btn-sm btn-outline-danger btn-delete">Delete</button>
+          <button class="btn btn-sm btn-outline-success btn-adjust">Adjust</button>
+        </td>
+      `
+      tr.querySelector('.btn-edit').onclick = ()=>openModal('edit', p)
+      tr.querySelector('.btn-delete').onclick = ()=>{ if(confirm('Delete product?')){ products = products.filter(x=>x.id!==p.id); save(products); render()} }
+      tr.querySelector('.btn-adjust').onclick = ()=>adjustPrompt(p)
+      tbl.appendChild(tr)
+    })
+  }
+
+  function adjustPrompt(p){
+    const amount = parseInt(prompt('Adjust by (use negative to subtract)', '0')||'0',10)
+    if(Number.isNaN(amount)) return alert('Invalid number')
+    p.stock = Math.max(0, p.stock + amount)
+    save(products); render();
+  }
+
+  function openModal(mode, p){
+    modal.style.display = 'flex'
+    modal.classList.add('show')
+    modalTitle.textContent = mode==='add' ? 'Add product' : 'Edit product'
+    const f = prodForm
+    if(mode==='edit'){
+      f.sku.value = p.sku
+      f.name.value = p.name
+      f.description.value = p.description || ''
+      f.price.value = p.price
+      f.stock.value = p.stock
+      f.reorder_threshold.value = p.reorder_threshold
+      f.id.value = p.id
+    }else{
+      f.reset(); f.id.value = ''
+    }
+  }
+  function closeModal(){ modal.style.display = 'none'; modal.classList.remove('show') }
+
+  saveBtn.onclick = ()=>{
+    const fd = new FormData(prodForm)
+    const obj = {
+      id: fd.get('id') || id(),
+      sku: (fd.get('sku')||'').trim(),
+      name: (fd.get('name')||'').trim(),
+      description: (fd.get('description')||'').trim(),
+      price: parseFloat(fd.get('price')||0) || 0,
+      stock: parseInt(fd.get('stock')||0,10) || 0,
+      reorder_threshold: parseInt(fd.get('reorder_threshold')||5,10) || 5
+    }
+    if(!obj.sku || !obj.name) return alert('SKU and name required')
+    const existing = products.find(x=>x.id===obj.id)
+    if(existing){ Object.assign(existing, obj) }
+    else{ products.push(obj) }
+    save(products); render(); closeModal()
+  }
+
+  cancelBtn.onclick = closeModal
+  modalClose.onclick = closeModal
+
+  addBtn.onclick = ()=>openModal('add')
+  exportBtn.onclick = ()=>{
+    const rows = [['SKU','Name','Description','Price','Stock','ReorderThreshold','TotalValue']]
+    products.forEach(p=> rows.push([p.sku,p.name,p.description||'',Number(p.price).toFixed(2),p.stock,p.reorder_threshold,(p.stock*p.price).toFixed(2)]))
+    const csv = rows.map(r=> r.map(cell=> '"'+String(cell).replace(/"/g,'""')+'"').join(',')).join('\n')
+    const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'inventory_report.csv'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+  }
+
+  clearBtn.onclick = ()=>{ if(confirm('Clear all data?')){ products=[]; save(products); render() } }
+  search.oninput = render
+  showLow.onchange = render
+
+  function escapeHtml(s){ return String(s||'').replace(/[&<>\"]+/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' })[c]||c) }
+
+  // seed data if empty
+  if(products.length===0){
+    products = [
+      {id:id(), sku:'DBR-001', name:'Espresso Beans 250g', description:'Dark roast', price:250.0, stock:20, reorder_threshold:5},
+      {id:id(), sku:'DBR-002', name:'Milk (1L)', description:'Fresh milk', price:80.0, stock:10, reorder_threshold:3},
+      {id:id(), sku:'DBR-003', name:'Cup (12oz)', description:'Disposable cup', price:2.5, stock:200, reorder_threshold:50},
+    ]; save(products)
+  }
+
+  render()
+})();
+</script>
+</body>
+</html>
